@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Data Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .chart-container {
+            width: 80%;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: none;
+        }
+        #pieChartContainer {
+            width: 40%;
+        }
+        #barChartContainer {
+            width: 60%;
+            max-width: 600px;
+            overflow-x: auto;
+        }
+        canvas {
+            max-height: 300px !important;
+        }
+        button, input {
+            padding: 10px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV Data Visualization</h1>
+    <input type="file" id="csvFileInput" accept=".csv">
+    <button onclick="processCSV()">Upload & Visualize</button>
+    <div class="chart-container" id="barChartContainer">
+        <h3>Data Comparison (Bar Chart)</h3>
+        <canvas id="barChart"></canvas>
+    </div>
+    <div class="chart-container" id="pieChartContainer">
+        <h3>Data Distribution (Pie Chart)</h3>
+        <canvas id="pieChart"></canvas>
+    </div>
+    <button onclick="downloadChart()">Download Charts</button>
+    <script>
+        Chart.register(ChartDataLabels);
+        let barChart, pieChart;
+        function processCSV() {
+            const fileInput = document.getElementById('csvFileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please upload a CSV file first.");
+                return;
+            }
+            Papa.parse(file, {
+                complete: function(results) {
+                    const csvData = results.data.filter(row => row.length > 1);
+                    if (csvData.length < 2) {
+                        alert("Invalid CSV format. Ensure it has at least two rows.");
+                        return;
+                    }
+                    const labels = csvData.slice(1).map(row => row[0]);
+                    const values = csvData.slice(1).map(row => parseFloat(row[1]));
+                    if (csvData.length > 100) {
+                        document.getElementById('barChartContainer').style.display = 'none';
+                        document.getElementById('pieChartContainer').style.display = 'block';
+                    } else {
+                        document.getElementById('barChartContainer').style.display = 'block';
+                        document.getElementById('pieChartContainer').style.display = 'block';
+                    }
+                    updateCharts(labels, values);
+                }
+            });
+        }
+        function updateCharts(labels, values) {
+            if (barChart) barChart.destroy();
+            if (pieChart) pieChart.destroy();
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            const options = {
+                responsive: true,
+                plugins: {
+                    datalabels: {
+                        formatter: (value, ctx) => {
+                            let sum = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            let percentage = ((value / sum) * 100).toFixed(2) + "%";
+                            return percentage;
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                }
+            };
+            if (labels.length <= 100) {
+                barChart = new Chart(barCtx, {
+                    type: 'bar',
+                    data: { labels: labels, datasets: [{ label: 'Data Values', data: values, backgroundColor: 'rgba(0, 123, 255, 0.6)', borderWidth: 1 }] },
+                    options: { ...options, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: Math.max(...values) * 1.1 } } }
+                });
+            }
+            pieChart = new Chart(pieCtx, {
+                type: 'pie',
+                data: { labels: labels.slice(0, 5), datasets: [{ data: values.slice(0, 5), backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"] }] },
+                options: options
+            });
+        }
+        function downloadChart() {
+            html2canvas(document.body).then(canvas => {
+                let link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'charts.png';
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>
